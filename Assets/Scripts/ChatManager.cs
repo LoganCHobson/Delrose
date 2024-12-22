@@ -35,54 +35,86 @@ public class ChatManager : NetworkBehaviour
 {
     private PlayerNetworkManager playerNetworkManager;
 
+    private PlayerMovement playerMovement;
+
     public TMP_InputField chatInputField;
     public GameObject messagePrefab;
     public Transform messageArea;
 
+    private List<Message> messageHistory = new List<Message>();
+    private int chatHistoryIndex;
+
     public Ranges currentRange = Ranges.NORMAL;
     public Languages currentLanguage = Languages.COMMON;
 
-    private bool inputIsSelected;
     private List<PlayerPosData> playerPosDataList = new List<PlayerPosData>();
     private ulong myID;
+
     private bool isReady;
+
+    
 
     private void Start()
     {
         playerNetworkManager = GetComponentInParent<PlayerNetworkManager>();
+
+        playerMovement = GetComponentInParent<PlayerMovement>();
     }
 
     private void Update()
     {
-        if (inputIsSelected && !string.IsNullOrEmpty(chatInputField.text))
+        if (chatInputField.isFocused)
         {
-            if (Input.GetKeyDown(KeyCode.Return))
-            {
-                string inputText = chatInputField.text;
-                Message newMessage = new Message
-                {
-                    range = currentRange,
-                    language = currentLanguage.ToString(),
-                    user = "Solar",
-                    chatMessage = ParseMessage(inputText) 
-                };
+            playerMovement.paused = true;
 
-                GetValidRecipients(newMessage);
-                chatInputField.text = "";
+            if (!string.IsNullOrEmpty(chatInputField.text))
+            {
+                if (Input.GetKeyDown(KeyCode.Return))
+                {
+                    string inputText = chatInputField.text;
+                    Message newMessage = new Message
+                    {
+                        range = currentRange,
+                        language = currentLanguage.ToString(),
+                        user = "Solar",
+                        chatMessage = ParseMessage(inputText)
+                    };
+                    messageHistory.Add(newMessage);
+                    chatHistoryIndex++;
+                    GetValidRecipients(newMessage);
+                    chatInputField.text = "";
+                }
             }
+
+            if (messageHistory.Count > 0)
+            {
+                if (Input.GetKeyDown(KeyCode.UpArrow))
+                {
+                    chatInputField.text = messageHistory[Mathf.Clamp(++chatHistoryIndex, 0, messageHistory.Count - 1)].chatMessage;
+                    return;
+                }
+
+
+                if (Input.GetKeyDown(KeyCode.DownArrow))
+                {
+                    chatInputField.text = messageHistory[Mathf.Clamp(--chatHistoryIndex, 0, messageHistory.Count - 1)].chatMessage;
+                    return;
+                }
+            }
+        }
+        else
+        {
+            playerMovement.paused = false;
         }
     }
 
-    public void InputFieldSelected(bool _value)
-    {
-        inputIsSelected = _value;
-    }
 
     public void DisplayMessage(Message _message)
     {
         GameObject newMessageObj = Instantiate(messagePrefab, messageArea);
         TMP_Text messageText = newMessageObj.GetComponentInChildren<TMP_Text>();
-        messageText.text = _message.chatMessage;
+
+        messageText.text = $"{_message.language} | {_message.user}- {_message.chatMessage}";
 
        
         AddLinkHandler(messageText);

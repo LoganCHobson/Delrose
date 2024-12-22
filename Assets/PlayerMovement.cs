@@ -4,12 +4,14 @@ using UnityEngine;
 public class PlayerMovement : NetworkBehaviour
 {
     public float moveSpeed = 5f;
+    public bool paused;
 
     private void Update()
     {
         if (!IsOwner) return;
 
-        HandleMovement();
+        if (!paused)
+            HandleMovement();
     }
 
     private void HandleMovement()
