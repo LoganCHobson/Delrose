@@ -5,6 +5,7 @@ using TMPro;
 using Unity.Netcode;
 using UnityEditor.PackageManager;
 using UnityEngine;
+using WebSocketSharp;
 
 public enum Languages
 {
@@ -43,6 +44,7 @@ public class ChatManager : NetworkBehaviour
 
     private List<PlayerPosData> playerPosDataList = new List<PlayerPosData>();
     private ulong myID;
+    private bool isReady;
 
     private void Start()
     {
@@ -55,7 +57,7 @@ public class ChatManager : NetworkBehaviour
     {
         if (inputIsSelected && !string.IsNullOrEmpty(chatInputField.text))
         {
-            if (Input.GetKeyDown(KeyCode.Return))
+            if (Input.GetKeyDown(KeyCode.Return) && !chatInputField.text.IsNullOrEmpty())
             {
                 Message newMessage = new Message
                 {
@@ -86,30 +88,39 @@ public class ChatManager : NetworkBehaviour
 
     public void GetValidRecipients(Message _message)
     {
+        isReady = false;
         GetPlayersServerRPC();
-       
-        Vector3 myPos = playerPosDataList.Find(p => p.clientId == myID).position;
-        Debug.Log($"My position: {myPos}");
 
-        List<ulong> targetPlayers = new List<ulong>();
-
-        foreach (PlayerPosData player in playerPosDataList)
+        StartCoroutine(WaitForPositionData(() =>
         {
-            Debug.Log($"Player {player.clientId} position: {player.position}");
-            float distance = Vector3.Distance(myPos, player.position);
-            if (distance <= (float)currentRange)
-            {
-                targetPlayers.Add(player.clientId);
-                Debug.Log($"The distance between {myID} and {player.clientId} is {distance} for the range {currentRange}");
-            }
-            else
-            {
-                Debug.Log($"{player.clientId} is out of range of {myID}");
-                Debug.Log($"The distance between {myID} and {player.clientId} is {distance} for the range {(float)currentRange}");
-            }
-        }
+            Vector3 myPos = playerPosDataList.Find(p => p.clientId == myID).position;
+            Debug.Log($"My position: {myPos}");
 
-        SendMessageServerRPC(targetPlayers.ToArray(), _message);
+            List<ulong> targetPlayers = new List<ulong>();
+
+            foreach (PlayerPosData player in playerPosDataList)
+            {
+                Debug.Log($"Player {player.clientId} position: {player.position}");
+                float distance = Vector3.Distance(myPos, player.position);
+                if (distance <= (float)currentRange)
+                {
+                    targetPlayers.Add(player.clientId);
+                    Debug.Log($"The distance between {myID} and {player.clientId} is {distance} for the range {currentRange}");
+                }
+                else
+                {
+                    Debug.Log($"{player.clientId} is out of range of {myID}");
+                    Debug.Log($"The distance between {myID} and {player.clientId} is {distance} for the range {(float)currentRange}");
+                }
+            }
+
+            SendMessageServerRPC(targetPlayers.ToArray(), _message);
+        }));
+    }
+    private IEnumerator WaitForPositionData(System.Action onReady)
+    {
+        yield return new WaitUntil(() => isReady); 
+        onReady?.Invoke(); 
     }
 
 
@@ -141,6 +152,7 @@ public class ChatManager : NetworkBehaviour
     {
         playerPosDataList = _allPlayerData.ToList<PlayerPosData>();
         myID = _clientId;
+        isReady = true;
     }
 
     [ServerRpc(RequireOwnership = false)]
