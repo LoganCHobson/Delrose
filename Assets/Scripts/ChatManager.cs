@@ -37,7 +37,8 @@ public class ChatManager : NetworkBehaviour
     public GameObject messagePrefab;
     public Transform messageArea;
 
-    private Ranges currentRange = Ranges.NORMAL;
+    public Ranges currentRange = Ranges.NORMAL;
+    public Languages currentLanguage = Languages.COMMON;
 
     private bool inputIsSelected;
     private CharacterSheet characterSheet;
@@ -61,8 +62,8 @@ public class ChatManager : NetworkBehaviour
             {
                 Message newMessage = new Message
                 {
-                    range = Ranges.NORMAL,
-                    language = "Common",
+                    range = currentRange,
+                    language = currentLanguage.ToString(),
                     user = "Solar",
                     chatMessage = chatInputField.text
                 };
