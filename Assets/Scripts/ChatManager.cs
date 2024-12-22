@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using Unity.Netcode;
 using UnityEngine;
@@ -31,13 +32,19 @@ public class ChatManager : NetworkBehaviour
     public GameObject messagePrefab;
     public Transform messageArea;
 
+    public Ranges currentRange;
+
     private bool inputIsSelected;
     private CharacterSheet characterSheet;
 
+    private PlayerPosition playerPositionClass;
+
     private void Start()
     {
+        playerPositionClass = GetComponentInParent<PlayerPosition>();
         characterSheet = GetComponentInParent<CharacterSheet>();
     }
+
     private void Update()
     {
         if (inputIsSelected && !string.IsNullOrEmpty(chatInputField.text))
@@ -52,49 +59,76 @@ public class ChatManager : NetworkBehaviour
                     chatMessage = chatInputField.text
                 };
 
-                SendMessageServerRpc(newMessage);
+                DisplayMessage(newMessage);
+                GetValidRecipients(newMessage); 
                 chatInputField.text = "";
             }
         }
     }
 
-    
-
-    public void InputFieldSelected(bool value)
+    public void InputFieldSelected(bool _value)
     {
-        inputIsSelected = value;
+        inputIsSelected = _value;
     }
 
-    void DisplayMessage(Message message)
+    void DisplayMessage(Message _message)
     {
         GameObject newMessageObj = Instantiate(messagePrefab, messageArea);
-        newMessageObj.GetComponentInChildren<TMP_Text>().text = $"{message.language} | {message.user}- {message.chatMessage}";
+        newMessageObj.GetComponentInChildren<TMP_Text>().text = $"{_message.language} | {_message.user}- {_message.chatMessage}";
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    void SendMessageServerRpc(Message message, ulong clientId = default) //So this is interesting. This sends a message up to the server.
+    public void GetValidRecipients(Message _message)
     {
+        playerPositionClass.AskServerForPosition();
+        Vector3 playerPosition = playerPositionClass.GetLastKnownPosition();
 
-        SendMessageClientRpc(message);
         
-            
+        playerPositionClass.AskServerForAllPositions();
+
+        
+        Dictionary<ulong, Vector3> allPlayerPositions = playerPositionClass.GetAllPlayerPositions();
+
+        Dictionary<ulong, Vector3> playersToSendTo = new Dictionary<ulong, Vector3>();
+
+        foreach (KeyValuePair<ulong, Vector3> player in allPlayerPositions)
+        {
+            if (player.Key == NetworkManager.Singleton.LocalClientId)
+            {
+                continue;
+            }
+
+            float distance = Vector3.Distance(playerPosition, player.Value);
+
+            if (distance <= (int)currentRange)
+            {
+                playersToSendTo.Add(player.Key, player.Value);
+            }
+        }
+
+        foreach (KeyValuePair<ulong, Vector3> targetPlayer in playersToSendTo)
+        {
+           
+            SendMessageToClientRpc(targetPlayer.Key, _message);
+        }
     }
 
     [ClientRpc]
-    void SendMessageClientRpc(Message message) //Will send to all clients and have them run DisplayMessage on their end.
+    private void SendMessageToClientRpc(ulong _clientId, Message _message, ClientRpcParams clientRpcParams = default)
     {
-        DisplayMessage(message);
+        if (NetworkManager.Singleton.LocalClientId == _clientId)
+        {
+           
+            DisplayMessage(_message);
+        }
     }
 }
 
-
-class Message : INetworkSerializable //So because we decided to be cool and to try to do things with classes, we gotta tell the server how to use it.
+public class Message : INetworkSerializable
 {
     public string language;
     public string user;
     public string chatMessage;
     public Ranges range;
-
 
     void INetworkSerializable.NetworkSerialize<T>(BufferSerializer<T> serializer)
     {
@@ -104,4 +138,5 @@ class Message : INetworkSerializable //So because we decided to be cool and to t
         serializer.SerializeValue(ref chatMessage);
     }
 }
+
 
