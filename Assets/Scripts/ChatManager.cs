@@ -88,16 +88,19 @@ public class ChatManager : NetworkBehaviour
 
             if (messageHistory.Count > 0)
             {
-                if (Input.GetKeyDown(KeyCode.UpArrow))
+                if (Input.GetKeyDown(KeyCode.F1))
                 {
-                    chatInputField.text = messageHistory[Mathf.Clamp(++chatHistoryIndex, 0, messageHistory.Count - 1)].chatMessage;
+                    chatHistoryIndex = Mathf.Clamp(chatHistoryIndex + 1, 0, messageHistory.Count - 1);
+                    chatInputField.text = messageHistory[chatHistoryIndex].chatMessage;
+                    //chatInputField.caretPosition = chatInputField.text.Length;
                     return;
                 }
 
-
-                if (Input.GetKeyDown(KeyCode.DownArrow))
+                if (Input.GetKeyDown(KeyCode.F2))
                 {
-                    chatInputField.text = messageHistory[Mathf.Clamp(--chatHistoryIndex, 0, messageHistory.Count - 1)].chatMessage;
+                    chatHistoryIndex = Mathf.Clamp(chatHistoryIndex - 1, 0, messageHistory.Count - 1);
+                    chatInputField.text = messageHistory[chatHistoryIndex].chatMessage;
+                    //chatInputField.caretPosition = chatInputField.text.Length;
                     return;
                 }
             }
