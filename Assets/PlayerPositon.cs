@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEditor.PackageManager;
@@ -15,6 +16,7 @@ public class PlayerPosition : NetworkBehaviour
     [ServerRpc(RequireOwnership = false)]
     public void RequestPositionServerRpc(ServerRpcParams rpcParams = default)
     {
+        Debug.Log("Server says your position is: " + transform.position);
         SendPositionClientRpc(transform.position);
     }
 
@@ -23,16 +25,27 @@ public class PlayerPosition : NetworkBehaviour
     {
         if (IsOwner)
         {
+            Debug.Log(gameObject.name + " says: i heard from server my position is: " + transform.position);
             lastKnownPosition = _position;
         }
     }
 
-    public void AskServerForPosition()
+    public void AskServerForPosition(System.Action<Vector3> callback = null)
     {
         if (IsOwner)
         {
             RequestPositionServerRpc();
+            StartCoroutine(WaitForLastKnownPosition(callback));
         }
+    }
+
+    private IEnumerator WaitForLastKnownPosition(System.Action<Vector3> callback)
+    {
+        while (lastKnownPosition == Vector3.zero)
+        {
+            yield return null; // Wait until lastKnownPosition is updated
+        }
+        callback?.Invoke(lastKnownPosition);
     }
 
     public Vector3 GetLastKnownPosition()
@@ -52,11 +65,13 @@ public class PlayerPosition : NetworkBehaviour
 
         foreach (var client in connectedClients)
         {
+            Debug.Log("Server say that the client ids are as follows: " + client.Key);
             var clientObject = client.Value.PlayerObject;
             if (clientObject != null)
             {
                 clientPositions[client.Key] = clientObject.transform.position;
             }
+            
         }
 
         List<ulong> clientsList = new List<ulong>();
@@ -67,6 +82,7 @@ public class PlayerPosition : NetworkBehaviour
         {
             clientsList.Add(pos.Key);
             positionList.Add(pos.Value);
+            Debug.Log("Server says: All player positions are as follows: " + pos.Key + " " + pos.Value);
         }
         
 
@@ -76,7 +92,10 @@ public class PlayerPosition : NetworkBehaviour
             position = positionList.ToArray(),
         };
 
-
+        for (int i = 0; i < positions.clientId.Length; i++)
+        {
+            Debug.Log("Server says that the stuff is packaged and that the positions are as follows: " + positions.clientId[i] + " " + positions.position[i]);
+        }
         SendAllPositionClientRpc(positions);
     }
 
@@ -86,15 +105,30 @@ public class PlayerPosition : NetworkBehaviour
         if (IsOwner)
         {
             allPlayerPositions = _positions;
+            for (int i = 0; i < _positions.clientId.Length; i++)
+            {
+                Debug.Log(gameObject.name + " heard from server that the positions are as follows: " + _positions.clientId[i] + " " + _positions.position[i]);
+            }
         }
+        
     }
 
-    public void AskServerForAllPositions()
+    public void AskServerForAllPositions(System.Action callback = null)
     {
         if (IsOwner)
         {
             RequestAllClientsPositionServerRpc();
+            StartCoroutine(WaitForAllPlayerPositions(callback));
         }
+    }
+
+    private IEnumerator WaitForAllPlayerPositions(System.Action callback)
+    {
+        while (allPlayerPositions == null || allPlayerPositions.clientId == null)
+        {
+            yield return null; // Wait until positions are populated
+        }
+        callback?.Invoke();
     }
 
     public Dictionary<ulong, Vector3> GetAllPlayerPositions()
@@ -105,10 +139,14 @@ public class PlayerPosition : NetworkBehaviour
         {
             for (int i = 0; i < allPlayerPositions.clientId.Length; i++)
             {
+                
                 playerPositions[allPlayerPositions.clientId[i]] = allPlayerPositions.position[i];
             }
         }
-
+        foreach (var kvp in playerPositions)
+        {
+            Debug.Log($"Player {kvp.Key} Position: {kvp.Value}");
+        }
         return playerPositions;
     }
 

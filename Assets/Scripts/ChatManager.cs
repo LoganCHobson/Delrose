@@ -32,7 +32,7 @@ public class ChatManager : NetworkBehaviour
     public GameObject messagePrefab;
     public Transform messageArea;
 
-    public Ranges currentRange;
+    private float currentRange = 50f;
 
     private bool inputIsSelected;
     private CharacterSheet characterSheet;
@@ -79,47 +79,67 @@ public class ChatManager : NetworkBehaviour
 
     public void GetValidRecipients(Message _message)
     {
-        playerPositionClass.AskServerForPosition();
-        Vector3 playerPosition = playerPositionClass.GetLastKnownPosition();
-
-        
-        playerPositionClass.AskServerForAllPositions();
-
-        
-        Dictionary<ulong, Vector3> allPlayerPositions = playerPositionClass.GetAllPlayerPositions();
-
-        Dictionary<ulong, Vector3> playersToSendTo = new Dictionary<ulong, Vector3>();
-
-        foreach (KeyValuePair<ulong, Vector3> player in allPlayerPositions)
+        playerPositionClass.AskServerForPosition(playerPosition =>
         {
-            if (player.Key == NetworkManager.Singleton.LocalClientId)
+            playerPositionClass.AskServerForAllPositions(() =>
             {
-                continue;
-            }
+                Dictionary<ulong, Vector3> allPlayerPositions = playerPositionClass.GetAllPlayerPositions();
+                Debug.Log(gameObject.name + " can send to " + allPlayerPositions.Count + " at " + allPlayerPositions.Keys + " " + allPlayerPositions.Values);
+                Dictionary<ulong, Vector3> playersToSendTo = new Dictionary<ulong, Vector3>();
 
-            float distance = Vector3.Distance(playerPosition, player.Value);
+                foreach (KeyValuePair<ulong, Vector3> player in allPlayerPositions)
+                {
+                    if (player.Key == NetworkManager.Singleton.LocalClientId)
+                        continue;
 
-            if (distance <= (int)currentRange)
-            {
-                playersToSendTo.Add(player.Key, player.Value);
-            }
-        }
+                    float distance = Vector3.Distance(playerPosition, player.Value);
+                    Debug.Log("Checking player " + player.Key + ": Distance = " + distance + ", Range = " + currentRange);
+                    if (distance <= currentRange)
+                    {
+                        Debug.Log(player.Key + " is in range at " + player.Value);
+                        playersToSendTo.Add(player.Key, player.Value);
+                    }
+                    else
+                    {
+                        Debug.Log(player.Key + " is NOT in range at " + player.Value);
+                    }
+                }
 
-        foreach (KeyValuePair<ulong, Vector3> targetPlayer in playersToSendTo)
+                Debug.Log("Target Players: " + playersToSendTo);
+                foreach (KeyValuePair<ulong, Vector3> targetPlayer in playersToSendTo)
+                {
+                    Debug.Log("Sending message to client " + targetPlayer.Key + " at position " + targetPlayer.Value);
+
+                    SendMessageToServerRPC(_message, targetPlayer.Key);
+
+                }
+                
+            });
+        });
+    }
+
+    [ServerRpc(RequireOwnership = false)]
+    private void SendMessageToServerRPC(Message _message, ulong _client)
+    {
+        var clientRpcParams = new ClientRpcParams
         {
-           
-            SendMessageToClientRpc(targetPlayer.Key, _message);
-        }
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] { _client }
+            }
+        };
+        Debug.Log("Server recieved message, forwarding. .");
+        SendMessageToClientRpc(_message, clientRpcParams);
+
     }
 
     [ClientRpc]
-    private void SendMessageToClientRpc(ulong _clientId, Message _message, ClientRpcParams clientRpcParams = default)
+    private void SendMessageToClientRpc(Message _message, ClientRpcParams clientRpcParams = default)
     {
-        if (NetworkManager.Singleton.LocalClientId == _clientId)
-        {
-           
+        
+            Debug.Log(gameObject.name + " heard someone saying " + _message);
             DisplayMessage(_message);
-        }
+        
     }
 }
 
