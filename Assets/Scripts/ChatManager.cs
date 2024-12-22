@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.Linq;
 using TMPro;
 using Unity.Netcode;
-using UnityEditor.PackageManager;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using WebSocketSharp;
 
 public enum Languages
 {
@@ -52,10 +50,14 @@ public class ChatManager : NetworkBehaviour
 
     private bool isReady;
 
-    
+    public GameObject canvas;
+
+
 
     private void Start()
     {
+
+        canvas.SetActive(false);
         playerNetworkManager = GetComponentInParent<PlayerNetworkManager>();
 
         playerMovement = GetComponentInParent<PlayerMovement>();
@@ -63,6 +65,13 @@ public class ChatManager : NetworkBehaviour
 
     private void Update()
     {
+        if (!IsOwner)
+            return;
+        if (Input.GetKeyDown(KeyCode.T) && !chatInputField.isFocused)
+        {
+            canvas.SetActive(!canvas.activeSelf);
+        }
+
         if (chatInputField.isFocused)
         {
             playerMovement.paused = true;
@@ -109,6 +118,7 @@ public class ChatManager : NetworkBehaviour
         {
             playerMovement.paused = false;
         }
+
     }
 
 
@@ -119,7 +129,7 @@ public class ChatManager : NetworkBehaviour
 
         messageText.text = $"{_message.language} | {_message.user}- {_message.chatMessage}";
 
-       
+
         AddLinkHandler(messageText);
     }
 
@@ -139,7 +149,7 @@ public class ChatManager : NetworkBehaviour
         {
             string playerName = match.Groups[1].Value; //EX "Billy waves"
             string animationName = match.Groups[2].Value;  //EX "wave1"
-            
+
             return $"<link={animationName}><u><color=blue>{playerName}</color></u></link>";
         });
     }
@@ -151,7 +161,7 @@ public class ChatManager : NetworkBehaviour
         {
             TMP_LinkInfo linkInfo = messageText.textInfo.linkInfo[linkIndex];
             string action = linkInfo.GetLinkID();
-            
+
             HandleAction(action);
         }
     }
@@ -159,7 +169,7 @@ public class ChatManager : NetworkBehaviour
     private void HandleAction(string action)
     {
         Debug.Log($"Triggering action: {action}");
-       
+
         if (action == "wave1")
         {
             PlayAnimation("Wave");
@@ -173,14 +183,14 @@ public class ChatManager : NetworkBehaviour
             Debug.LogWarning($"Unknown action: {action}");
         }
 
-        
+
     }
 
     private void PlayAnimation(string animationName)
     {
         Debug.Log($"Playing animation: {animationName}");
 
-        
+
     }
 
 
@@ -217,8 +227,8 @@ public class ChatManager : NetworkBehaviour
     }
     private IEnumerator WaitForPositionData(System.Action onReady)
     {
-        yield return new WaitUntil(() => isReady); 
-        onReady?.Invoke(); 
+        yield return new WaitUntil(() => isReady);
+        onReady?.Invoke();
     }
 
 
