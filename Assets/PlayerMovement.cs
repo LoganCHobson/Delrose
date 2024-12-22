@@ -22,21 +22,6 @@ public class PlayerMovement : NetworkBehaviour
         if (moveDirection != Vector3.zero)
         {
             transform.position += moveDirection * moveSpeed * Time.deltaTime;
-            SubmitPositionServerRpc(transform.position);
         }
-    }
-
-    [ServerRpc]
-    private void SubmitPositionServerRpc(Vector3 position)
-    {
-        //Update the position on the server.
-        UpdatePositionClientRpc(position);
-    }
-
-    [ClientRpc]
-    private void UpdatePositionClientRpc(Vector3 position)
-    {
-        //Update the position on all clients.
-        if (!IsOwner) transform.position = position;
     }
 }

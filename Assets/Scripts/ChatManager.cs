@@ -1,6 +1,9 @@
+using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using Unity.Netcode;
+using UnityEditor.PackageManager;
 using UnityEngine;
 
 public enum Languages
@@ -25,26 +28,29 @@ public enum Ranges
     GLOBAL = 9999,
 }
 
-
 public class ChatManager : NetworkBehaviour
 {
+    private PlayerNetworkManager playerNetworkManager;
+
     public TMP_InputField chatInputField;
     public GameObject messagePrefab;
     public Transform messageArea;
 
-    private float currentRange = 50f;
+    private Ranges currentRange = Ranges.NORMAL;
 
     private bool inputIsSelected;
     private CharacterSheet characterSheet;
 
-    private PlayerPosition playerPositionClass;
+    private List<PlayerPosData> playerPosDataList = new List<PlayerPosData>();
+    private ulong myID;
 
     private void Start()
     {
-        playerPositionClass = GetComponentInParent<PlayerPosition>();
-        characterSheet = GetComponentInParent<CharacterSheet>();
-    }
+        playerNetworkManager = GetComponentInParent<PlayerNetworkManager>();
+        
+        //characterSheet = GetComponentInParent<CharacterSheet>();
 
+    }
     private void Update()
     {
         if (inputIsSelected && !string.IsNullOrEmpty(chatInputField.text))
@@ -59,8 +65,8 @@ public class ChatManager : NetworkBehaviour
                     chatMessage = chatInputField.text
                 };
 
-                DisplayMessage(newMessage);
-                GetValidRecipients(newMessage); 
+                //DisplayMessage(newMessage);
+                GetValidRecipients(newMessage);
                 chatInputField.text = "";
             }
         }
@@ -71,76 +77,90 @@ public class ChatManager : NetworkBehaviour
         inputIsSelected = _value;
     }
 
-    void DisplayMessage(Message _message)
+    public void DisplayMessage(Message _message)
     {
         GameObject newMessageObj = Instantiate(messagePrefab, messageArea);
         newMessageObj.GetComponentInChildren<TMP_Text>().text = $"{_message.language} | {_message.user}- {_message.chatMessage}";
     }
 
+
     public void GetValidRecipients(Message _message)
     {
-        playerPositionClass.AskServerForPosition(playerPosition =>
+        GetPlayersServerRPC();
+       
+        Vector3 myPos = playerPosDataList.Find(p => p.clientId == myID).position;
+        Debug.Log($"My position: {myPos}");
+
+        List<ulong> targetPlayers = new List<ulong>();
+
+        foreach (PlayerPosData player in playerPosDataList)
         {
-            playerPositionClass.AskServerForAllPositions(() =>
+            Debug.Log($"Player {player.clientId} position: {player.position}");
+            float distance = Vector3.Distance(myPos, player.position);
+            if (distance <= (float)currentRange)
             {
-                Dictionary<ulong, Vector3> allPlayerPositions = playerPositionClass.GetAllPlayerPositions();
-                Debug.Log(gameObject.name + " can send to " + allPlayerPositions.Count + " at " + allPlayerPositions.Keys + " " + allPlayerPositions.Values);
-                Dictionary<ulong, Vector3> playersToSendTo = new Dictionary<ulong, Vector3>();
+                targetPlayers.Add(player.clientId);
+                Debug.Log($"The distance between {myID} and {player.clientId} is {distance} for the range {currentRange}");
+            }
+            else
+            {
+                Debug.Log($"{player.clientId} is out of range of {myID}");
+                Debug.Log($"The distance between {myID} and {player.clientId} is {distance} for the range {(float)currentRange}");
+            }
+        }
 
-                foreach (KeyValuePair<ulong, Vector3> player in allPlayerPositions)
-                {
-                    if (player.Key == NetworkManager.Singleton.LocalClientId)
-                        continue;
-
-                    float distance = Vector3.Distance(playerPosition, player.Value);
-                    Debug.Log("Checking player " + player.Key + ": Distance = " + distance + ", Range = " + currentRange);
-                    if (distance <= currentRange)
-                    {
-                        Debug.Log(player.Key + " is in range at " + player.Value);
-                        playersToSendTo.Add(player.Key, player.Value);
-                    }
-                    else
-                    {
-                        Debug.Log(player.Key + " is NOT in range at " + player.Value);
-                    }
-                }
-
-                Debug.Log("Target Players: " + playersToSendTo);
-                foreach (KeyValuePair<ulong, Vector3> targetPlayer in playersToSendTo)
-                {
-                    Debug.Log("Sending message to client " + targetPlayer.Key + " at position " + targetPlayer.Value);
-
-                    SendMessageToServerRPC(_message, targetPlayer.Key);
-
-                }
-                
-            });
-        });
+        SendMessageServerRPC(targetPlayers.ToArray(), _message);
     }
 
-    [ServerRpc(RequireOwnership = false)]
-    private void SendMessageToServerRPC(Message _message, ulong _client)
-    {
-        var clientRpcParams = new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams
-            {
-                TargetClientIds = new ulong[] { _client }
-            }
-        };
-        Debug.Log("Server recieved message, forwarding. .");
-        SendMessageToClientRpc(_message, clientRpcParams);
 
+    [ServerRpc(RequireOwnership = false)]
+    public void GetPlayersServerRPC(ServerRpcParams _param = default)
+    {
+        ulong senderId = _param.Receive.SenderClientId; //Gets who asked.
+        //Vector3 position = NetworkManager.Singleton.ConnectedClients[senderId].PlayerObject.transform.position; //Gets one 
+
+        List<PlayerPosData> allPlayerData = new List<PlayerPosData>();
+
+        foreach (var client in NetworkManager.Singleton.ConnectedClientsList) //Gets all
+        {
+            allPlayerData.Add(new PlayerPosData
+            {
+                clientId = client.ClientId,
+                position = client.PlayerObject.transform.position
+            });
+
+            Debug.Log("Server says " + client.ClientId + " is at " + client.PlayerObject.transform.position);
+        }
+
+
+        SendPositionUpdateClientRpc(senderId, allPlayerData.ToArray(), new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new[] { senderId } } }); //Sends back to who asked.
     }
 
     [ClientRpc]
-    private void SendMessageToClientRpc(Message _message, ClientRpcParams clientRpcParams = default)
+    private void SendPositionUpdateClientRpc(ulong _clientId, PlayerPosData[] _allPlayerData, ClientRpcParams _param)
     {
-        
-            Debug.Log(gameObject.name + " heard someone saying " + _message);
-            DisplayMessage(_message);
-        
+        playerPosDataList = _allPlayerData.ToList<PlayerPosData>();
+        myID = _clientId;
     }
+
+    [ServerRpc(RequireOwnership = false)]
+    public void SendMessageServerRPC(ulong[] _targetPlayers, Message _message, ServerRpcParams _param = default)
+    {
+        SendMessageClientRPC(_message, new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = _targetPlayers
+            }
+        });
+    }
+
+    [ClientRpc]
+    public void SendMessageClientRPC(Message _message, ClientRpcParams _param = default)
+    {
+        DisplayMessage(_message);
+    }
+
 }
 
 public class Message : INetworkSerializable
@@ -159,4 +179,14 @@ public class Message : INetworkSerializable
     }
 }
 
+public struct PlayerPosData : INetworkSerializable
+{
+    public ulong clientId;
+    public Vector3 position;
 
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+    {
+        serializer.SerializeValue(ref clientId);
+        serializer.SerializeValue(ref position);
+    }
+}
