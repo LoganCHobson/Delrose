@@ -5,6 +5,8 @@ using TMPro;
 using Unity.Netcode;
 using UnityEditor.PackageManager;
 using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.UI;
 using WebSocketSharp;
 
 public enum Languages
@@ -41,8 +43,6 @@ public class ChatManager : NetworkBehaviour
     public Languages currentLanguage = Languages.COMMON;
 
     private bool inputIsSelected;
-    private CharacterSheet characterSheet;
-
     private List<PlayerPosData> playerPosDataList = new List<PlayerPosData>();
     private ulong myID;
     private bool isReady;
@@ -50,25 +50,23 @@ public class ChatManager : NetworkBehaviour
     private void Start()
     {
         playerNetworkManager = GetComponentInParent<PlayerNetworkManager>();
-        
-        //characterSheet = GetComponentInParent<CharacterSheet>();
-
     }
+
     private void Update()
     {
         if (inputIsSelected && !string.IsNullOrEmpty(chatInputField.text))
         {
-            if (Input.GetKeyDown(KeyCode.Return) && !chatInputField.text.IsNullOrEmpty())
+            if (Input.GetKeyDown(KeyCode.Return))
             {
+                string inputText = chatInputField.text;
                 Message newMessage = new Message
                 {
                     range = currentRange,
                     language = currentLanguage.ToString(),
                     user = "Solar",
-                    chatMessage = chatInputField.text
+                    chatMessage = ParseMessage(inputText) 
                 };
 
-                //DisplayMessage(newMessage);
                 GetValidRecipients(newMessage);
                 chatInputField.text = "";
             }
@@ -83,7 +81,71 @@ public class ChatManager : NetworkBehaviour
     public void DisplayMessage(Message _message)
     {
         GameObject newMessageObj = Instantiate(messagePrefab, messageArea);
-        newMessageObj.GetComponentInChildren<TMP_Text>().text = $"{_message.language} | {_message.user}- {_message.chatMessage}";
+        TMP_Text messageText = newMessageObj.GetComponentInChildren<TMP_Text>();
+        messageText.text = _message.chatMessage;
+
+       
+        AddLinkHandler(messageText);
+    }
+
+    private void AddLinkHandler(TMP_Text messageText)
+    {
+        messageText.GetComponentInParent<Canvas>().gameObject.AddComponent<GraphicRaycaster>();
+
+        var linkHandler = messageText.gameObject.AddComponent<ChatLinkHandler>();
+        linkHandler.Setup(messageText, OnMessageClick);
+    }
+
+    private string ParseMessage(string message)
+    {
+        //[PlayerName=AnimationName]
+        string pattern = @"\[(.*?)=(.*?)\]";
+        return System.Text.RegularExpressions.Regex.Replace(message, pattern, match =>
+        {
+            string playerName = match.Groups[1].Value; //EX "Billy waves"
+            string animationName = match.Groups[2].Value;  //EX "wave1"
+            
+            return $"<link={animationName}><u><color=blue>{playerName}</color></u></link>";
+        });
+    }
+
+    private void OnMessageClick(TMP_Text messageText)
+    {
+        int linkIndex = TMP_TextUtilities.FindIntersectingLink(messageText, Input.mousePosition, null);
+        if (linkIndex != -1)
+        {
+            TMP_LinkInfo linkInfo = messageText.textInfo.linkInfo[linkIndex];
+            string action = linkInfo.GetLinkID();
+            
+            HandleAction(action);
+        }
+    }
+
+    private void HandleAction(string action)
+    {
+        Debug.Log($"Triggering action: {action}");
+       
+        if (action == "wave1")
+        {
+            PlayAnimation("Wave");
+        }
+        else if (action == "dance1")
+        {
+            PlayAnimation("Dance");
+        }
+        else
+        {
+            Debug.LogWarning($"Unknown action: {action}");
+        }
+
+        
+    }
+
+    private void PlayAnimation(string animationName)
+    {
+        Debug.Log($"Playing animation: {animationName}");
+
+        
     }
 
 
@@ -201,5 +263,22 @@ public struct PlayerPosData : INetworkSerializable
     {
         serializer.SerializeValue(ref clientId);
         serializer.SerializeValue(ref position);
+    }
+}
+
+public class ChatLinkHandler : MonoBehaviour, IPointerClickHandler
+{
+    private TMP_Text messageText;
+    private System.Action<TMP_Text> onClick;
+
+    public void Setup(TMP_Text text, System.Action<TMP_Text> clickAction)
+    {
+        messageText = text;
+        onClick = clickAction;
+    }
+
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        onClick?.Invoke(messageText);
     }
 }
