@@ -13,7 +13,7 @@ public class ServerManager : MonoBehaviour
         else
         {
             Debug.Log("Running as Client");
-            NetworkManager.Singleton.StartClient(); // Start the client.
+             // Start the client.
         }
     }
 }
