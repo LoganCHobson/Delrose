@@ -3,43 +3,18 @@ using UnityEngine;
 
 public class CharacterSheet : MonoBehaviour
 {
-    public string characterName;
-    public int characterAge;
-    public string characterGender;
-    public string bio;
-    public List<Languages> languages = new List<Languages>();
 
-    public Character character;
+    public CharacterInfo character;
 
-    private void Start()
-    {
-        character = new Character
-        {
-            name = characterName,
-            age = characterAge,
-            gender = characterGender,
-            bio = bio,
-            knownLanguages = languages,
-
-        };
-
-    }
-
-    private void Update()
-    {
-        if (character.name == null)
-        {
-            character.name = characterName;
-        }
-    }
 
 }
-
-public class Character
+[System.Serializable]
+public class CharacterInfo
 {
     public string name;
     public int age;
+    public string race;
     public string gender;
     public string bio;
-    public List<Languages> knownLanguages;
+    public List<Languages> knownLanguages = new List<Languages>();
 }

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 
 public class MainMenuManager : MonoBehaviour
@@ -10,5 +11,10 @@ public class MainMenuManager : MonoBehaviour
     {
         _obj.SetActive(!_obj.activeInHierarchy);
         mainMenuCanv.SetActive(!mainMenuCanv.activeInHierarchy);
+    }
+
+    public void ToCustomization()
+    {
+        SceneManager.LoadScene("CharacterCustomization");
     }
 }
