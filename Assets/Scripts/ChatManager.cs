@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using TMPro;
 using Unity.Netcode;
@@ -55,21 +54,23 @@ public class ChatManager : NetworkBehaviour
 
     public GameObject canvas;
 
+    public TMP_Dropdown rangeDropDown;
+    public TMP_Dropdown languageDropDown;
+
     private void Start()
     {
         characterSheet = GetComponentInParent<CharacterSheet>();
-        
+
         playerNetworkManager = GetComponentInParent<PlayerNetworkManager>();
 
         playerMovement = GetComponentInParent<PlayerMovement>();
 
-       /* if (!IsOwner)
-            return;
-                                     //Should return to figuring out how to do this.
+        
+        
         canvas.SetActive(false);
-    
-        */
-        }
+
+
+    }
 
     private void Update()
     {
@@ -208,6 +209,58 @@ public class ChatManager : NetworkBehaviour
         Debug.Log($"Playing animation: {animationName}");
 
 
+    }
+
+    public void SetLanguage(TMP_Dropdown dropdown)
+    {
+        switch (dropdown.value)
+        {
+            case 1:
+                currentLanguage = Languages.COMMON;
+                break;
+            case 2:
+                currentLanguage = Languages.ELVISH;
+                break;
+            case 3:
+                currentLanguage = Languages.DWARVISH;
+                break;
+            case 4:
+                currentLanguage = Languages.ORCISH;
+                break;
+
+        }
+    }
+
+    public void SetRange(TMP_Dropdown dropdown)
+    {
+        switch (dropdown.value)
+        {
+            case 1:
+                currentRange = Ranges.WHISPER;
+                break;
+            case 2:
+                currentRange = Ranges.QUIET;
+                break;
+            case 3:
+                currentRange = Ranges.INDOORS;
+                break;
+            case 4:
+                currentRange = Ranges.NORMAL;
+                break;
+            case 5:
+                currentRange = Ranges.OUTDOORS;
+                break;
+            case 6:
+                currentRange = Ranges.SHOUT;
+                break;
+            case 7:
+                currentRange = Ranges.DM;
+                break;
+            case 8:
+                currentRange = Ranges.EVENT;
+                break;
+
+        }
     }
 
 
