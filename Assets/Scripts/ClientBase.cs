@@ -15,6 +15,8 @@ public class ClientBase : NetworkBehaviour
             Debug.Log("Adjusting Ownership. .");
             GetComponentInChildren<Camera>(true).gameObject.SetActive(true);
             GetComponent<PlayerMovement>().enabled = true;
+            
+
         }
     }
 }
