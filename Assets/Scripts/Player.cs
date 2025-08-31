@@ -3,10 +3,22 @@ using UnityEngine;
 public class Player : ClientBase
 {
     public PlayerData PlayerData;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+
+    public static Player Instance;
+
+    void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(this.gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
     void Start()
     {
-        
+        character = CharacterBus.Instance.character;
     }
 
     // Update is called once per frame

@@ -33,13 +33,13 @@ public class ChatManager : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = false)]
-    void SendMessageToServerRpc(string message, ServerRpcParams rpcParams = default)
+    void SendMessageToServerRpc(string message, ServerRpcParams rpcParams = default) //Code ran on the server
     {
         SendMessageClientRpc(message);
     }
 
     [ClientRpc]
-    void SendMessageClientRpc(string message)
+    void SendMessageClientRpc(string message) //Code ran on the client.
     {
         AddMessage(message);
     }
@@ -74,6 +74,5 @@ public class ChatManager : NetworkBehaviour
         {
             SendChatMessage();
         }
-
     }
 }

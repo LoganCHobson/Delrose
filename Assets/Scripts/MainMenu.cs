@@ -17,10 +17,14 @@ public class MainMenu : MonoBehaviour
         
     }
 
-    public void OnClick()
+    public void ToLobby()
     {
         SceneManager.LoadScene("Lobby");
     }
 
-    
+    public void ToCharacterCreation()
+    {
+        SceneManager.LoadScene("CharacterCustomization");
+    }
+
 }
